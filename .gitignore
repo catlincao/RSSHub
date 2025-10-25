@@ -12,6 +12,8 @@
 .yarn
 .yarnrc.yml
 .pnp*
+.history
+
 
 *.swp
 *.iml
