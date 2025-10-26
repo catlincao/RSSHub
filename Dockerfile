@@ -5,7 +5,7 @@ FROM node:22-bookworm AS dep-builder
 WORKDIR /app
 
 # place ARG statement before RUN statement which need it to avoid cache miss
-ARG USE_CHINA_NPM_REGISTRY=0
+ARG USE_CHINA_NPM_REGISTRY=1
 RUN \
     set -ex && \
     corepack enable pnpm && \
@@ -51,16 +51,16 @@ FROM node:22-bookworm-slim AS docker-minifier
 WORKDIR /minifier
 COPY --from=dep-version-parser /ver/* /minifier/
 
-ARG USE_CHINA_NPM_REGISTRY=0
+ARG USE_CHINA_NPM_REGISTRY=1
 RUN \
     set -ex && \
+    npm install -g corepack@latest && \
+    corepack enable pnpm && \
     if [ "$USE_CHINA_NPM_REGISTRY" = 1 ]; then \
         npm config set registry https://registry.npmmirror.com && \
         yarn config set registry https://registry.npmmirror.com && \
         pnpm config set registry https://registry.npmmirror.com ; \
     fi; \
-    npm install -g corepack@latest && \
-    corepack enable pnpm && \
     pnpm add @vercel/nft@$(cat .nft_version) fs-extra@$(cat .fs_extra_version) --save-prod
 
 COPY . /app
@@ -91,13 +91,14 @@ COPY ./.puppeteerrc.cjs /app/
 COPY --from=dep-version-parser /ver/.puppeteer_version /app/.puppeteer_version
 
 ARG TARGETPLATFORM
-ARG USE_CHINA_NPM_REGISTRY=0
-ARG PUPPETEER_SKIP_DOWNLOAD=1
+ARG USE_CHINA_NPM_REGISTRY=1
+ARG PUPPETEER_SKIP_DOWNLOAD=0
 # The official recommended way to use Puppeteer on x86(_64) is to use the bundled Chromium from Puppeteer:
 # https://pptr.dev/faq#q-why-doesnt-puppeteer-vxxx-workwith-chromium-vyyy
 RUN \
     set -ex ; \
     if [ "$PUPPETEER_SKIP_DOWNLOAD" = 0 ] && [ "$TARGETPLATFORM" = 'linux/amd64' ]; then \
+        corepack enable pnpm && \
         if [ "$USE_CHINA_NPM_REGISTRY" = 1 ]; then \
             npm config set registry https://registry.npmmirror.com && \
             yarn config set registry https://registry.npmmirror.com && \
@@ -105,7 +106,6 @@ RUN \
         fi; \
         echo 'Downloading Chromium...' && \
         unset PUPPETEER_SKIP_DOWNLOAD && \
-        corepack enable pnpm && \
         pnpm --allow-build=rebrowser-puppeteer add rebrowser-puppeteer@$(cat /app/.puppeteer_version) --save-prod && \
         pnpm rb && \
         pnpx rebrowser-puppeteer browsers install chrome ; \
@@ -126,7 +126,7 @@ WORKDIR /app
 
 # install deps first to avoid cache miss or disturbing buildkit to build concurrently
 ARG TARGETPLATFORM
-ARG PUPPETEER_SKIP_DOWNLOAD=1
+ARG PUPPETEER_SKIP_DOWNLOAD=0
 # https://pptr.dev/troubleshooting#chrome-headless-doesnt-launch-on-unix
 # https://github.com/puppeteer/puppeteer/issues/7822
 # https://www.debian.org/releases/bookworm/amd64/release-notes/ch-information.en.html#noteworthy-obsolete-packages
@@ -134,6 +134,10 @@ ARG PUPPETEER_SKIP_DOWNLOAD=1
 # https://github.com/puppeteer/puppeteer/blob/07391bbf5feaf85c191e1aa8aa78138dce84008d/packages/puppeteer-core/src/node/BrowserFetcher.ts#L128-L131
 RUN \
     set -ex && \
+    # 替换 Debian 源为阿里云镜像（解决国内访问问题）
+    echo "deb http://mirrors.aliyun.com/debian/ bookworm main non-free contrib" > /etc/apt/sources.list && \
+    echo "deb http://mirrors.aliyun.com/debian-security/ bookworm-security main" >> /etc/apt/sources.list && \
+    echo "deb http://mirrors.aliyun.com/debian/ bookworm-updates main non-free contrib" >> /etc/apt/sources.list && \
     apt-get update && \
     apt-get install -yq --no-install-recommends \
         dumb-init git curl \
