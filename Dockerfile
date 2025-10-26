@@ -54,6 +54,9 @@ COPY --from=dep-version-parser /ver/* /minifier/
 ARG USE_CHINA_NPM_REGISTRY=1
 RUN \
     set -ex && \
+    apt-get update && \
+    apt-get install -yq --no-install-recommends git && \
+    apt-get clean && \
     npm install -g corepack@latest && \
     corepack enable pnpm && \
     if [ "$USE_CHINA_NPM_REGISTRY" = 1 ]; then \
@@ -97,6 +100,9 @@ ARG PUPPETEER_SKIP_DOWNLOAD=0
 # https://pptr.dev/faq#q-why-doesnt-puppeteer-vxxx-workwith-chromium-vyyy
 RUN \
     set -ex ; \
+    apt-get update && \
+    apt-get install -yq --no-install-recommends git && \
+    apt-get clean && \
     if [ "$PUPPETEER_SKIP_DOWNLOAD" = 0 ] && [ "$TARGETPLATFORM" = 'linux/amd64' ]; then \
         corepack enable pnpm && \
         if [ "$USE_CHINA_NPM_REGISTRY" = 1 ]; then \
